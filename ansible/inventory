@@ -1,0 +1,14 @@
+[all:vars]  
+ansible_ssh_private_key_file=/root/id_rsa
+ansible_host_key_checking=False
+
+[local]
+localhost ansible_connection=local
+
+[azure_vms]
+staging-azure-vm ansible_host=XXX.XXX.XXX.XXX
+
+[azure_vms:vars]
+ansible_user=jclmon
+ansible_ssh_private_key_file=/root/id_rsa
+ansible_python_interpreter=/usr/bin/python3

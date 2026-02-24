@@ -1,0 +1,21 @@
+# Replace with your actual Azure subscription ID
+subscription_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+location        = "westeurope"
+project         = "devops_iac_caso_practico_2"
+name_prefix     = "jclmon-iac"
+environment     = "casopractico2"
+extra_tags = {
+	owner       = "admin"
+	cost_center = "student-lab"
+}
+admin_username  = "azureuser"
+vm_image_publisher = "Canonical"
+vm_image_offer     = "0001-com-ubuntu-server-jammy"
+vm_image_sku       = "22_04-lts"
+vm_image_version   = "latest"
+
+# Example only. Use your real public key from ~/.ssh/id_rsa.pub or ~/.ssh/id_ed25519.pub
+ssh_public_key  = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... your-key"
+
+# Strongly recommended: restrict to your own public IP CIDR, e.g. 203.0.113.10/32
+allowed_ssh_cidr = "203.0.113.1/32"
