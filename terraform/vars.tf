@@ -45,6 +45,12 @@ variable "ssh_public_key" {
 	sensitive   = true
 }
 
+variable "ssh_private_key_path" {
+	description = "Ruta local a la clave privada SSH para Ansible."
+	type        = string
+	sensitive   = true
+}
+
 variable "vm_size" {
 	description = "Tamano de la VM en Azure."
 	type        = string
