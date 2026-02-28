@@ -1,0 +1,136 @@
+---
+# ACR Role - Manage Azure Container Registry images
+# This role connects to ACR, pulls public images, tags them, and pushes to ACR
+# Also builds custom nginx image with personalized content from project files
+
+- name: Login to Azure Container Registry
+  containers.podman.podman_login:
+    username: "{{ acr_username }}"
+    password: "{{ acr_password }}"
+    registry: "{{ acr_login_server }}"
+  when: acr_username is defined and acr_password is defined
+  tags:
+    - acr_login
+
+- name: Pull public images with retry
+  containers.podman.podman_image:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ public_images }}"
+  retries: 3
+  delay: 10
+  register: pull_result
+  until: pull_result is succeeded
+  tags:
+    - pull_images
+
+- name: Tag images for ACR
+  shell: "podman tag {{ item }} {{ acr_login_server }}/{{ item | regex_replace('^(.*)/(.*)$', '\\2') }}"
+  loop: "{{ public_images }}"
+  changed_when: true
+  tags:
+    - tag_images
+
+- name: Push images to ACR
+  shell: "podman push {{ acr_login_server }}/{{ item | regex_replace('^(.*)/(.*)$', '\\2') }}"
+  loop: "{{ public_images }}"
+  retries: 3
+  delay: 5
+  register: push_result
+  until: push_result is succeeded
+  tags:
+    - push_images
+
+- name: Set custom image variables
+  set_fact:
+    custom_image_name: "{{ custom_image_name | default('nginx-custom') }}"
+    custom_image_tag: "{{ custom_image_tag | default('latest') }}"
+    work_dir: "{{ work_dir | default('/tmp/nginx-custom') }}"
+  tags:
+    - custom-image
+
+- name: Create working directory for custom image
+  file:
+    path: "{{ work_dir }}"
+    state: directory
+    mode: "0755"
+  tags:
+    - custom-image
+
+- name: Copy custom index.html from template
+  template:
+    src: index.html.j2
+    dest: "{{ work_dir }}/index.html"
+  tags:
+    - custom-image
+
+- name: Copy Containerfile from project
+  copy:
+    src: Containerfile
+    dest: "{{ work_dir }}/Containerfile"
+  tags:
+    - custom-image
+
+- name: Pull nginx base image
+  containers.podman.podman_image:
+    name: "docker.io/library/nginx:latest"
+    state: present
+    pull: yes
+  retries: 3
+  delay: 10
+  register: nginx_pull_result
+  until: nginx_pull_result is succeeded
+  tags:
+    - custom-image
+
+- name: Build custom nginx image with Podman
+  shell: |
+    cd {{ work_dir }}
+    podman build -t {{ custom_image_name }}:{{ custom_image_tag }} -f Containerfile .
+  register: build_result
+  tags:
+    - custom-image
+
+- name: Verify custom image was built
+  debug:
+    msg: "Custom image built successfully: {{ custom_image_name }}:{{ custom_image_tag }}"
+  tags:
+    - custom-image
+
+- name: Tag custom image for ACR
+  shell: |
+    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/{{ custom_image_name }}:{{ custom_image_tag }}
+    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/{{ custom_image_name }}:latest
+  tags:
+    - custom-image
+
+- name: Push custom image to ACR
+  shell: "podman push {{ acr_login_server }}/{{ custom_image_name }}:{{ item }}"
+  loop:
+    - "{{ custom_image_tag }}"
+    - "latest"
+  retries: 3
+  delay: 5
+  register: custom_push_result
+  until: custom_push_result is succeeded
+  tags:
+    - custom-image
+
+# ========== RESUMEN FINAL ==========
+
+- name: Display ACR info
+  debug:
+    msg: |
+      Success! Images pushed to ACR:
+      - Public images: {{ public_images | length }} imágenes
+      - Custom image: {{ acr_login_server }}/{{ custom_image_name }}:latest
+  tags:
+    - always
+
+- name: Cleanup working directory (optional)
+  file:
+    path: "{{ work_dir }}"
+    state: absent
+  when: cleanup_after_build | default(false)
+  tags:
+    - cleanup

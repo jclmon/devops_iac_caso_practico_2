@@ -1,0 +1,7 @@
+---
+# Handlers for ACR role
+
+- name: Logout from ACR
+  containers.podman.podman_logout:
+    registry: "{{ acr_login_server }}"
+  listen: "logout_acr"

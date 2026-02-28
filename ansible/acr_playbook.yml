@@ -1,0 +1,35 @@
+---
+# Playbook to manage ACR images
+# Usage: ansible-playbook -i inventory acr_playbook.yml
+
+- name: Manage Azure Container Registry Images
+  hosts: acr
+  gather_facts: true
+  become: yes
+  become_method: sudo
+  vars:
+    # Images to push to ACR
+    public_images:
+      - "docker.io/bitnami/redis:latest"
+      - "docker.io/suhuruli/azure-vote-front:latest"
+
+  roles:
+    - acr
+
+  pre_tasks:
+    - name: Display ACR info
+      debug:
+        msg: |
+          ACR Configuration:
+          - Server: {{ acr_login_server }}
+          - Name: {{ acr_name }}
+          - Username: {{ acr_username }}
+      tags:
+        - always
+
+  post_tasks:
+    - name: Verify images in ACR
+      debug:
+        msg: "Images have been successfully pushed to {{ acr_login_server }}"
+      tags:
+        - always

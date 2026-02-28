@@ -1,0 +1,17 @@
+---
+# Default variables for ACR role
+
+# ACR connection details (populated by Terraform)
+acr_login_server: ""
+acr_username: ""
+acr_password: ""
+acr_name: ""
+
+# Public images to pull and push to ACR
+public_images:
+  - "docker.io/library/nginx:latest"
+  - "docker.io/library/ubuntu:22.04"
+  - "docker.io/library/alpine:latest"
+
+# Podman binary path
+podman_executable: "podman"

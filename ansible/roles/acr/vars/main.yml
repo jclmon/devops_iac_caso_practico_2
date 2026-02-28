@@ -1,0 +1,9 @@
+---
+# Role-specific variables for ACR
+# These variables should be passed via playbook or inventory
+
+# Expected variables from Terraform:
+# - acr_login_server: Login server of ACR
+# - acr_username: Admin username from ACR
+# - acr_password: Admin password from ACR
+# - acr_name: Name of the ACR
