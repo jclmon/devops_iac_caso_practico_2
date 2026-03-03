@@ -1,0 +1,112 @@
+---
+# VM Role - Configure and deploy container on Azure VM
+
+# Update package repositories
+- name: Update package repositories
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  become: true
+  tags:
+    - update_repos
+
+# Install Podman and dependencies
+- name: Install Podman and dependencies
+  apt:
+    name:
+      - podman
+      - curl
+      - wget
+      - git
+      - python3-pip
+      - apache2-utils
+    state: present
+  become: true
+  tags:
+    - install_podman
+
+# Create volume directory if needed
+- name: Create volume mount directory
+  file:
+    path: "{{ volume_mount_path }}"
+    state: directory
+    mode: "0755"
+  become: true
+  tags:
+    - setup_volume
+
+# Login to ACR
+- name: Login to Azure Container Registry
+  containers.podman.podman_login:
+    username: "{{ acr_username }}"
+    password: "{{ acr_password }}"
+    registry: "{{ acr_login_server }}"
+  tags:
+    - acr_login
+
+# Pull images from ACR
+- name: Pull images from ACR
+  containers.podman.podman_image:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ acr_images }}"
+  tags:
+    - pull_image
+
+# Create systemd service file for Nginx container
+- name: Create systemd service file for Nginx container
+  template:
+    src: nginx-app.service.j2
+    dest: /etc/systemd/system/{{ container_name }}.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  tags:
+    - create_service
+
+# Reload systemd daemon
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+  become: true
+  tags:
+    - reload_systemd
+
+# Enable container service to start on boot
+- name: Enable container service to start on boot
+  systemd:
+    name: "{{ container_name }}.service"
+    enabled: yes
+    state: started
+  become: true
+  tags:
+    - enable_service
+
+# Verify container is running via systemd
+- name: Verify container is running via systemd
+  systemd:
+    name: "{{ container_name }}.service"
+  register: service_status
+  become: true
+  tags:
+    - verify_service
+
+# Display service information
+- name: Display service information
+  debug:
+    msg: |
+      Container Service Status:
+      - Service: {{ container_name }}.service
+      - State: {{ service_status.status.ActiveState }}
+      - Enabled: {{ service_status.status.UnitFileState }}
+      - Image: {{ container_image }}
+      - Port: {{ container_port }}
+
+      Management commands:
+      - Start:   systemctl start {{ container_name }}
+      - Stop:    systemctl stop {{ container_name }}
+      - Restart: systemctl restart {{ container_name }}
+      - Status:  systemctl status {{ container_name }}
+  tags:
+    - always

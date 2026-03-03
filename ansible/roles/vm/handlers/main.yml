@@ -1,0 +1,21 @@
+---
+# Handlers for VM role
+
+- name: Restart container
+  containers.podman.podman_container:
+    name: "{{ container_name }}"
+    state: restarted
+  listen: "restart_container"
+
+- name: Stop container
+  containers.podman.podman_container:
+    name: "{{ container_name }}"
+    state: stopped
+  listen: "stop_container"
+
+- name: Restart system
+  reboot:
+    msg: "Rebooting system after updates"
+    reboot_timeout: 300
+  become: true
+  listen: "reboot_system"

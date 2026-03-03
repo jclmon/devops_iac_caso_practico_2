@@ -1,0 +1,27 @@
+---
+# Default variables for VM role
+
+# ACR connection details
+acr_login_server: ""
+acr_username: ""
+acr_password: ""
+
+# Container configuration
+container_name: "app-container"
+container_image: ""
+container_port: 80
+
+# Volume mount configuration
+volume_mount_path: "/var/container/data"
+auth_file_path: "/etc/container/auth/htpasswd"
+
+# Basic authentication
+basic_auth_username: "admin"
+basic_auth_password: "changeme"
+
+# Podman configuration
+podman_executable: "podman"
+
+# System update options
+apt_update_cache: true
+apt_cache_valid_time: 3600

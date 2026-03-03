@@ -1,0 +1,88 @@
+---
+# Playbook to configure VM and deploy container
+# Usage: ansible-playbook -i inventory vm_playbook.yml
+
+- name: Configure and Deploy Container on Azure VM
+  hosts: azure_vms
+  become: yes
+  become_method: sudo
+  gather_facts: true
+
+  vars:
+    # Container configuration
+    container_name: "nginx-app"
+    container_image: "{{ acr_login_server }}/custom/nginx-custom:casopractico2"
+    container_port: 80
+
+    # Images to pull from ACR
+    acr_images:
+      - "{{ acr_login_server }}/custom/nginx-custom:casopractico2"
+
+    # Volume configuration
+    volume_mount_path: "/data/container"
+
+    # Basic authentication
+    basic_auth_username: "admin"
+    basic_auth_password: "changeme123!"
+
+  pre_tasks:
+    - name: Display VM information
+      debug:
+        msg: |
+          VM Configuration:
+          - Hostname: {{ ansible_hostname }}
+          - OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          - IP: {{ ansible_default_ipv4.address }}
+          - User: {{ ansible_user_id }}
+      tags:
+        - always
+
+    - name: Check if user has sudo privileges
+      command: sudo -l
+      changed_when: false
+      ignore_errors: true
+      tags:
+        - always
+
+  roles:
+    - vm
+
+  post_tasks:
+    - name: Display container deployment summary
+      debug:
+        msg: |
+          ✓ Container Deployment Complete!
+          - Container Name: {{ container_name }}
+          - Container Image: {{ container_image }}
+          - Port: 80
+          - ServiceUnit: {{ container_name }}.service
+          - Persistent: YES ✓ (systemd service, auto-restart on reboot)
+
+          Access nginx app at: http://{{ ansible_default_ipv4.address }}:80
+
+          Service Management (systemctl commands):
+          - Start:    systemctl start {{ container_name }}
+          - Stop:     systemctl stop {{ container_name }}
+          - Restart:  systemctl restart {{ container_name }}
+          - Status:   systemctl status {{ container_name }}
+          - Enable:   systemctl enable {{ container_name }}
+          - Disable:  systemctl disable {{ container_name }}
+          - Logs:     journalctl -u {{ container_name }} -f
+      tags:
+        - always
+
+    - name: Get container service logs
+      shell: "journalctl -u {{ container_name }}.service -n 5 --no-pager"
+      register: service_logs
+      ignore_errors: true
+      tags:
+        - always
+
+    - name: Display service logs
+      debug:
+        msg: |
+          Recent Service Logs:
+          {{ service_logs.stdout }}
+      when: service_logs.stdout is defined
+      tags:
+        - always

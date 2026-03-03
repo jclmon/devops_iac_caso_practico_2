@@ -1,0 +1,24 @@
+[Unit]
+Description=Nginx Container on Podman ({{ container_name }})
+Documentation=man:podman-run(1)
+After=network.target podman.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+TimeoutStopSec=70
+Environment="PODMAN_SYSTEMD_UNIT=%n"
+ExecStartPre=-/usr/bin/podman rm -f {{ container_name }}
+ExecStart=/usr/bin/podman run -d \
+  --name={{ container_name }} \
+  -p {{ container_port }}:80 \
+  --network host \
+  --restart=always \
+  {{ container_image }}
+ExecStop=/usr/bin/podman stop -t 10 {{ container_name }}
+ExecStopPost=/usr/bin/podman rm -f {{ container_name }}
+
+[Install]
+WantedBy=multi-user.target

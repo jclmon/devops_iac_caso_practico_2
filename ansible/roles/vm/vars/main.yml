@@ -1,0 +1,9 @@
+---
+# Role-specific variables for VM
+# These variables should be passed via playbook or inventory
+
+# Expected variables from Terraform:
+# - container_image: Full ACR image URL (e.g., myregistry.azurecr.io/nginx:latest)
+# - acr_login_server: ACR login server URL
+# - acr_username: ACR admin username
+# - acr_password: ACR admin password
