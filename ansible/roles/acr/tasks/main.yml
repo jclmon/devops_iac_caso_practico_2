@@ -14,7 +14,7 @@
 
 - name: Pull public images with retry
   containers.podman.podman_image:
-    name: "{{ item }}"
+    name: "{{ item.image }}"
     state: present
   loop: "{{ public_images }}"
   retries: 3
@@ -24,15 +24,22 @@
   tags:
     - pull_images
 
-- name: Tag images for ACR
-  shell: "podman tag {{ item }} {{ acr_login_server }}/{{ item | regex_replace('^(.*)/(.*)$', '\\2') }}"
+- name: Re-tag images to casopractico2 version
+  command: "podman tag {{ item.image }} {{ item.image | regex_replace(':.*', ':' ~ item.tag_version) }}"
+  loop: "{{ public_images }}"
+  changed_when: true
+  tags:
+    - re_tag_images
+
+- name: Tag images for ACR with folder organization
+  command: "podman tag {{ item.image | regex_replace(':.*', ':' ~ item.tag_version) }} {{ acr_login_server }}/{{ item.folder }}/{{ item.image.split('/')[2].split(':')[0] }}:{{ item.tag_version }}"
   loop: "{{ public_images }}"
   changed_when: true
   tags:
     - tag_images
 
-- name: Push images to ACR
-  shell: "podman push {{ acr_login_server }}/{{ item | regex_replace('^(.*)/(.*)$', '\\2') }}"
+- name: Push images to ACR with folder organization
+  command: "podman push {{ acr_login_server }}/{{ item.folder }}/{{ item.image.split('/')[2].split(':')[0] }}:{{ item.tag_version }}"
   loop: "{{ public_images }}"
   retries: 3
   delay: 5
@@ -44,7 +51,7 @@
 - name: Set custom image variables
   set_fact:
     custom_image_name: "{{ custom_image_name | default('nginx-custom') }}"
-    custom_image_tag: "{{ custom_image_tag | default('latest') }}"
+    custom_image_tag: "{{ custom_image_tag | default('casopractico2') }}"
     work_dir: "{{ work_dir | default('/tmp/nginx-custom') }}"
   tags:
     - custom-image
@@ -97,18 +104,18 @@
   tags:
     - custom-image
 
-- name: Tag custom image for ACR
+- name: Tag custom image for ACR with folder
   shell: |
-    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/{{ custom_image_name }}:{{ custom_image_tag }}
-    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/{{ custom_image_name }}:latest
+    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/custom/{{ custom_image_name }}:{{ custom_image_tag }}
+    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/custom/{{ custom_image_name }}:casopractico2
   tags:
     - custom-image
 
 - name: Push custom image to ACR
-  shell: "podman push {{ acr_login_server }}/{{ custom_image_name }}:{{ item }}"
+  shell: "podman push {{ acr_login_server }}/custom/{{ custom_image_name }}:{{ item }}"
   loop:
     - "{{ custom_image_tag }}"
-    - "latest"
+    - "casopractico2"
   retries: 3
   delay: 5
   register: custom_push_result

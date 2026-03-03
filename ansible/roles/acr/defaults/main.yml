@@ -7,11 +7,10 @@ acr_username: ""
 acr_password: ""
 acr_name: ""
 
-# Public images to pull and push to ACR
+# Public images to pull and push to ACR (organized by folder)
 public_images:
-  - "docker.io/library/nginx:latest"
-  - "docker.io/library/ubuntu:22.04"
-  - "docker.io/library/alpine:latest"
+  - image: "docker.io/library/nginx:casopractico2"
+    folder: "base"
 
 # Podman binary path
 podman_executable: "podman"

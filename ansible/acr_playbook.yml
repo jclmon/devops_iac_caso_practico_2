@@ -8,10 +8,14 @@
   become: yes
   become_method: sudo
   vars:
-    # Images to push to ACR
+    # Images to push to ACR with folder organization
     public_images:
-      - "docker.io/bitnami/redis:latest"
-      - "docker.io/suhuruli/azure-vote-front:latest"
+      - image: "docker.io/bitnami/redis:latest"
+        folder: "databases"
+        tag_version: "casopractico2"
+      - image: "docker.io/suhuruli/azure-vote-front:latest"
+        folder: "frontend"
+        tag_version: "casopractico2"
 
   roles:
     - acr
