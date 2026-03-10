@@ -89,6 +89,7 @@
     name: "{{ container_name }}.service"
   register: service_status
   become: true
+  ignore_errors: true
   tags:
     - verify_service
 
@@ -108,5 +109,6 @@
       - Stop:    systemctl stop {{ container_name }}
       - Restart: systemctl restart {{ container_name }}
       - Status:  systemctl status {{ container_name }}
+  when: service_status is defined and service_status.status is defined
   tags:
     - always

@@ -10,15 +10,13 @@ Restart=always
 RestartSec=5
 TimeoutStopSec=70
 Environment="PODMAN_SYSTEMD_UNIT=%n"
+ExecStartPre=-/usr/bin/podman stop -t 5 {{ container_name }}
 ExecStartPre=-/usr/bin/podman rm -f {{ container_name }}
-ExecStart=/usr/bin/podman run -d \
+ExecStart=/usr/bin/podman run --rm \
   --name={{ container_name }} \
   -p {{ container_port }}:80 \
-  --network host \
-  --restart=always \
   {{ container_image }}
-ExecStop=/usr/bin/podman stop -t 10 {{ container_name }}
-ExecStopPost=/usr/bin/podman rm -f {{ container_name }}
+ExecStop=-/usr/bin/podman stop -t 10 {{ container_name }}
 
 [Install]
 WantedBy=multi-user.target
