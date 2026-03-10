@@ -1,0 +1,98 @@
+---
+# Playbook to deploy application on AKS
+# Usage: ansible-playbook -i inventory aks_playbook.yml
+
+- name: Deploy Application on Azure Kubernetes Service
+  hosts: aks
+  gather_facts: false
+
+  vars:
+    # Override these values for your deployment
+    namespace: "casopractico2"
+    deployment_name: "app-deployment"
+    app_name: "cats-vs-dogs"
+    replicas: 2
+    container_port: 80
+    service_port: 80
+    pvc_size: "10Gi"
+    cpu_request: "100m"
+    memory_request: "128Mi"
+    cpu_limit: "500m"
+    memory_limit: "512Mi"
+    # Container images from ACR with folder organization
+    container_image: "{{ acr_login_server }}/frontend/azure-vote-front:casopractico2"
+    redis_image: "{{ acr_login_server }}/databases/redis:casopractico2"
+
+  pre_tasks:
+    - name: Display AKS deployment configuration
+      debug:
+        msg: |
+          AKS Deployment Configuration:
+          - Cluster: {{ aks_cluster_name }}
+          - Resource Group: {{ resource_group_name }}
+          - Namespace: {{ namespace }}
+          - Container Image: {{ container_image }}
+          - Replicas: {{ replicas }}
+          - PVC Size: {{ pvc_size }}
+      tags:
+        - always
+
+    - name: Verify required variables
+      assert:
+        that:
+          - resource_group_name is defined and resource_group_name != ''
+          - aks_cluster_name is defined and aks_cluster_name != ''
+          - acr_login_server is defined and acr_login_server != ''
+          - container_image is defined and container_image != ''
+        fail_msg: "Required variables are missing"
+      tags:
+        - always
+
+  roles:
+    - aks
+
+  post_tasks:
+    - name: Wait for pods to be ready
+      shell: |
+        kubectl rollout status deployment/{{ deployment_name }} -n {{ namespace }} \
+          --timeout=5m --kubeconfig={{ kubeconfig_path }}
+      ignore_errors: true
+      tags:
+        - always
+
+    - name: Get application access information
+      shell: |
+        EXTERNAL_IP=$(kubectl get service {{ service_name }} -n {{ namespace }} \
+          -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --kubeconfig={{ kubeconfig_path }})
+
+        if [ -z "$EXTERNAL_IP" ]; then
+          echo "External IP is still pending. Wait a few moments and check with:"
+          echo "kubectl get service {{ service_name }} -n {{ namespace }}"
+        else
+          echo "Application accessible at: http://$EXTERNAL_IP:{{ service_port }}"
+        fi
+      register: app_access_info
+      tags:
+        - always
+
+    - name: Display application access information
+      debug:
+        msg: "{{ app_access_info.stdout }}"
+      tags:
+        - always
+
+    - name: Get pod status
+      shell: |
+        kubectl get pods -n {{ namespace }} -l app={{ app_name }} \
+          -o wide --kubeconfig={{ kubeconfig_path }}
+      register: pod_status
+      tags:
+        - always
+
+    - name: Display pod status
+      debug:
+        msg: |
+          Pod Status:
+          {{ pod_status.stdout }}
+      tags:
+        - always

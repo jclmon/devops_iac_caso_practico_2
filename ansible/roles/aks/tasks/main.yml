@@ -1,0 +1,280 @@
+---
+# AKS Role - Deploy application on Azure Kubernetes Service
+
+# Get kubeconfig credentials
+- name: Get AKS kubeconfig
+  shell: |
+    az aks get-credentials \
+      --resource-group {{ resource_group_name }} \
+      --name {{ aks_cluster_name }} \
+      --overwrite-existing
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  tags:
+    - setup_kubeconfig
+
+# Create namespace
+- name: Create Kubernetes namespace
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ namespace }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  tags:
+    - create_namespace
+
+# Create ACR secret for authentication
+- name: Create ACR image pull secret
+  shell: |
+    kubectl create secret docker-registry {{ acr_secret_name }} \
+      --docker-server={{ acr_login_server }} \
+      --docker-username={{ acr_username }} \
+      --docker-password={{ acr_password }} \
+      --docker-email=admin@example.com \
+      --namespace={{ namespace }} \
+      --kubeconfig={{ kubeconfig_path }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  tags:
+    - create_acr_secret
+
+# Create Persistent Volume Claim
+- name: Create Persistent Volume Claim
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: "{{ pvc_name }}"
+        namespace: "{{ namespace }}"
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: "{{ pvc_size }}"
+        storageClassName: "{{ storage_class }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  tags:
+    - create_pvc
+
+# Create ConfigMap for application configuration
+- name: Create ConfigMap for app configuration
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ app_config_name }}"
+        namespace: "{{ namespace }}"
+      data:
+        APP_NAME: "{{ app_name }}"
+        ENVIRONMENT: "{{ app_environment }}"
+        LOG_LEVEL: "{{ log_level }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  tags:
+    - create_configmap
+
+# Create Redis Deployment
+- name: Create Redis Deployment
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: "redis-deployment"
+        namespace: "{{ namespace }}"
+        labels:
+          app: "redis"
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app: "redis"
+        template:
+          metadata:
+            labels:
+              app: "redis"
+          spec:
+            imagePullSecrets:
+              - name: "{{ acr_secret_name }}"
+            containers:
+              - name: "redis"
+                image: "{{ redis_image }}"
+                imagePullPolicy: Always
+                ports:
+                  - containerPort: 6379
+                    name: redis
+                env:
+                  - name: ALLOW_EMPTY_PASSWORD
+                    value: "yes"
+                resources:
+                  requests:
+                    memory: "64Mi"
+                    cpu: "50m"
+                  limits:
+                    memory: "256Mi"
+                    cpu: "250m"
+    kubeconfig: "{{ kubeconfig_path }}"
+  tags:
+    - create_redis_deployment
+
+# Create Redis Service
+- name: Create Redis Service
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "redis-service"
+        namespace: "{{ namespace }}"
+        labels:
+          app: "redis"
+      spec:
+        type: ClusterIP
+        selector:
+          app: "redis"
+        ports:
+          - protocol: TCP
+            port: 6379
+            targetPort: 6379
+            name: redis
+    kubeconfig: "{{ kubeconfig_path }}"
+  tags:
+    - create_redis_service
+
+# Create Kubernetes Deployment
+- name: Create Kubernetes Deployment
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: "{{ deployment_name }}"
+        namespace: "{{ namespace }}"
+        labels:
+          app: "{{ app_name }}"
+      spec:
+        replicas: "{{ replicas }}"
+        selector:
+          matchLabels:
+            app: "{{ app_name }}"
+        template:
+          metadata:
+            labels:
+              app: "{{ app_name }}"
+          spec:
+            imagePullSecrets:
+              - name: "{{ acr_secret_name }}"
+            containers:
+              - name: "{{ container_name }}"
+                image: "{{ container_image }}"
+                imagePullPolicy: Always
+                ports:
+                  - containerPort: "{{ container_port }}"
+                    name: http
+                env:
+                  - name: REDIS
+                    value: "redis-service"
+                volumeMounts:
+                  - name: data
+                    mountPath: "{{ container_mount_path }}"
+                resources:
+                  requests:
+                    memory: "{{ memory_request }}"
+                    cpu: "{{ cpu_request }}"
+                  limits:
+                    memory: "{{ memory_limit }}"
+                    cpu: "{{ cpu_limit }}"
+            volumes:
+              - name: data
+                persistentVolumeClaim:
+                  claimName: "{{ pvc_name }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  tags:
+    - create_deployment
+
+# Create LoadBalancer Service
+- name: Create LoadBalancer Service
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: "{{ service_name }}"
+        namespace: "{{ namespace }}"
+        labels:
+          app: "{{ app_name }}"
+      spec:
+        type: LoadBalancer
+        selector:
+          app: "{{ app_name }}"
+        ports:
+          - protocol: TCP
+            port: "{{ service_port }}"
+            targetPort: "{{ container_port }}"
+            name: http
+        sessionAffinity: None
+    kubeconfig: "{{ kubeconfig_path }}"
+  tags:
+    - create_service
+
+# Wait for LoadBalancer to get External IP
+- name: Wait for LoadBalancer External IP
+  kubernetes.core.k8s_info:
+    kind: Service
+    name: "{{ service_name }}"
+    namespace: "{{ namespace }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: service_info
+  until: service_info.resources[0].status.loadBalancer.ingress is defined
+  retries: 30
+  delay: 10
+  tags:
+    - wait_for_lb
+
+# Display deployment information
+- name: Get deployment status
+  shell: |
+    kubectl get deployment {{ deployment_name }} -n {{ namespace }} -o wide \
+      --kubeconfig={{ kubeconfig_path }}
+  register: deployment_status
+  tags:
+    - always
+
+- name: Get service information
+  shell: |
+    kubectl get service {{ service_name }} -n {{ namespace }} -o wide \
+      --kubeconfig={{ kubeconfig_path }}
+  register: service_status
+  tags:
+    - always
+
+- name: Display AKS deployment information
+  debug:
+    msg: |
+      ✓ AKS Deployment Complete!
+
+      Namespace: {{ namespace }}
+      Deployment: {{ deployment_name }}
+      Service: {{ service_name }}
+
+      Deployment Status:
+      {{ deployment_status.stdout }}
+
+      Service Status:
+      {{ service_status.stdout }}
+
+      External IP: {{ service_info.resources[0].status.loadBalancer.ingress[0].ip if service_info.resources[0].status.loadBalancer.ingress is defined else 'Pending' }}
+  tags:
+    - always

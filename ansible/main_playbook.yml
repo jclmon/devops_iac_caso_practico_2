@@ -1,0 +1,12 @@
+---
+# Master Playbook - Ejecuta ACR, VM y AKS playbooks en orden
+# Usage: ansible-playbook -i inventory main_playbook.yml
+
+- name: "Infrastructure Setup - Phase 1: ACR Image Management"
+  import_playbook: acr_playbook.yml
+
+- name: "Infrastructure Setup - Phase 2: VM Web Server"
+  import_playbook: vm_playbook.yml
+
+- name: "Infrastructure Setup - Phase 3: AKS Cluster Management"
+  import_playbook: aks_playbook.yml

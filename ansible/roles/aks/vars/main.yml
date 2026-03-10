@@ -1,0 +1,11 @@
+---
+# Role-specific variables for AKS
+# These variables should be passed via playbook or inventory
+
+# Expected variables from Terraform:
+# - resource_group_name: Resource group where AKS cluster is located
+# - aks_cluster_name: Name of the AKS cluster
+# - acr_login_server: ACR login server URL
+# - acr_username: ACR admin username
+# - acr_password: ACR admin password
+# - container_image: Full container image URL from ACR (e.g., registry.azurecr.io/app:latest)

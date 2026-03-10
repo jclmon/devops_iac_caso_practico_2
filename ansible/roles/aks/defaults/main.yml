@@ -1,0 +1,46 @@
+---
+# Default variables for AKS role
+
+# AKS and Azure configuration
+resource_group_name: ""
+aks_cluster_name: ""
+kubeconfig_path: "~/.kube/config"
+
+# ACR configuration
+acr_login_server: ""
+acr_username: ""
+acr_password: ""
+acr_secret_name: "acr-secret"
+
+# Kubernetes configuration
+namespace: "default"
+app_environment: "production"
+
+# Deployment configuration
+deployment_name: "app-deployment"
+app_name: "app"
+container_name: "app-container"
+container_image: "{{ acr_login_server }}/frontend/azure-vote-front:casopractico2"
+redis_image: "{{ acr_login_server }}/databases/redis:casopractico2"
+container_port: 80
+container_mount_path: "/data"
+replicas: 2
+
+# Resource requests and limits
+cpu_request: "100m"
+memory_request: "128Mi"
+cpu_limit: "500m"
+memory_limit: "512Mi"
+
+# Service configuration
+service_name: "app-service"
+service_port: 80
+
+# Persistent Volume configuration
+pvc_name: "app-pvc"
+pvc_size: "10Gi"
+storage_class: "default"
+
+# ConfigMap configuration
+app_config_name: "app-config"
+log_level: "INFO"
