@@ -2,9 +2,20 @@
 # Handlers for AKS role
 
 - name: Restart deployment
-  shell: |
-    kubectl rollout restart deployment/{{ deployment_name }} -n {{ namespace }} \
-      --kubeconfig={{ kubeconfig_path }}
+  kubernetes.core.k8s:
+    state: patched
+    definition:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: "{{ deployment_name }}"
+        namespace: "{{ namespace }}"
+      spec:
+        template:
+          metadata:
+            annotations:
+              restartedAt: "{{ ansible_date_time.iso8601 }}"
+    kubeconfig: "{{ kubeconfig_path }}"
   listen: "restart_deployment"
 
 - name: Delete deployment
