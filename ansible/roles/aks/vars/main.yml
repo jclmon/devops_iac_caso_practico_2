@@ -9,3 +9,24 @@
 # - acr_username: ACR admin username
 # - acr_password: ACR admin password
 # - container_image: Full container image URL from ACR (e.g., registry.azurecr.io/app:latest)
+
+# ========== REDIS RESOURCES ==========
+redis_replicas: 1
+redis_container_port: 6379
+
+# Redis resource requests
+redis_memory_request: "64Mi"
+redis_cpu_request: "50m"
+
+# Redis resource limits
+redis_memory_limit: "256Mi"
+redis_cpu_limit: "250m"
+
+# ========== DEPLOYMENT RESOURCES ==========
+# Application deployment resource requests
+app_memory_request: "128Mi"
+app_cpu_request: "100m"
+
+# Application deployment resource limits
+app_memory_limit: "512Mi"
+app_cpu_limit: "500m"
