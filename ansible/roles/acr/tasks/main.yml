@@ -25,21 +25,24 @@
     - pull_images
 
 - name: Re-tag images to casopractico2 version
-  command: "podman tag {{ item.image }} {{ item.image | regex_replace(':.*', ':' ~ item.tag_version) }}"
+  ansible.builtin.command:
+    cmd: podman tag {{ item.image }} {{ item.image | regex_replace(':.*', ':' ~ item.tag_version) }}
   loop: "{{ public_images }}"
   changed_when: true
   tags:
     - re_tag_images
 
 - name: Tag images for ACR with folder organization
-  command: "podman tag {{ item.image | regex_replace(':.*', ':' ~ item.tag_version) }} {{ acr_login_server }}/{{ item.folder }}/{{ item.image.split('/')[2].split(':')[0] }}:{{ item.tag_version }}"
+  ansible.builtin.command:
+    cmd: podman tag {{ item.image | regex_replace(':.*', ':' ~ item.tag_version) }} {{ acr_login_server }}/{{ item.folder }}/{{ item.image.split('/')[2].split(':')[0] }}:{{ item.tag_version }}
   loop: "{{ public_images }}"
   changed_when: true
   tags:
     - tag_images
 
 - name: Push images to ACR with folder organization
-  command: "podman push {{ acr_login_server }}/{{ item.folder }}/{{ item.image.split('/')[2].split(':')[0] }}:{{ item.tag_version }}"
+  ansible.builtin.command:
+    cmd: podman push {{ acr_login_server }}/{{ item.folder }}/{{ item.image.split('/')[2].split(':')[0] }}:{{ item.tag_version }}
   loop: "{{ public_images }}"
   retries: 3
   delay: 5
@@ -91,9 +94,13 @@
     - custom-image
 
 - name: Build custom nginx image with Podman
-  shell: |
-    cd {{ work_dir }}
-    podman build -t {{ custom_image_name }}:{{ custom_image_tag }} -f Containerfile .
+  containers.podman.podman_image:
+    name: "{{ custom_image_name }}"
+    tag: "{{ custom_image_tag }}"
+    path: "{{ work_dir }}"
+    build:
+      file: "{{ work_dir }}/Containerfile"
+    state: present
   register: build_result
   tags:
     - custom-image
@@ -105,14 +112,20 @@
     - custom-image
 
 - name: Tag custom image for ACR with folder
-  shell: |
-    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/custom/{{ custom_image_name }}:{{ custom_image_tag }}
-    podman tag {{ custom_image_name }}:{{ custom_image_tag }} {{ acr_login_server }}/custom/{{ custom_image_name }}:casopractico2
+  ansible.builtin.command:
+    cmd: podman tag {{ item.source }} {{ item.dest }}
+  loop:
+    - source: "{{ custom_image_name }}:{{ custom_image_tag }}"
+      dest: "{{ acr_login_server }}/custom/{{ custom_image_name }}:{{ custom_image_tag }}"
+    - source: "{{ custom_image_name }}:{{ custom_image_tag }}"
+      dest: "{{ acr_login_server }}/custom/{{ custom_image_name }}:casopractico2"
+  changed_when: true
   tags:
     - custom-image
 
 - name: Push custom image to ACR
-  shell: "podman push {{ acr_login_server }}/custom/{{ custom_image_name }}:{{ item }}"
+  ansible.builtin.command:
+    cmd: podman push {{ acr_login_server }}/custom/{{ custom_image_name }}:{{ item }}
   loop:
     - "{{ custom_image_tag }}"
     - "casopractico2"
