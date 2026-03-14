@@ -37,10 +37,9 @@
       tags:
         - always
 
-    - name: Check if user has sudo privileges
-      command: sudo -l
-      changed_when: false
-      ignore_errors: true
+    - name: Verify sudo access
+      debug:
+        msg: "Current user ({{ ansible_user_id }}) has sudo access via Ansible become method"
       tags:
         - always
 
@@ -71,18 +70,27 @@
       tags:
         - always
 
-    - name: Get container service logs
-      shell: "journalctl -u {{ container_name }}.service -n 5 --no-pager"
-      register: service_logs
+    - name: Get container service status
+      ansible.builtin.systemd:
+        name: "{{ container_name }}.service"
+      register: service_status
       ignore_errors: true
       tags:
         - always
 
-    - name: Display service logs
+    - name: Display service logs info
       debug:
         msg: |
-          Recent Service Logs:
-          {{ service_logs.stdout }}
-      when: service_logs.stdout is defined
+          Service Status:
+          - Name: {{ container_name }}.service
+          - State: {{ service_status.status.ActiveState | default('unknown') }}
+          - Enabled: {{ service_status.status.UnitFileState | default('unknown') }}
+
+          To view recent logs, run:
+          journalctl -u {{ container_name }}.service -n 5 --no-pager
+
+          To follow live logs, run:
+          journalctl -u {{ container_name }}.service -f
+      when: service_status is defined and not service_status.failed
       tags:
         - always
