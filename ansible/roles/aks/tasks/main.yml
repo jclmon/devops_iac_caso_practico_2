@@ -3,13 +3,22 @@
 
 # Get kubeconfig credentials
 - name: Get AKS kubeconfig
-  shell: |
-    az aks get-credentials \
-      --resource-group {{ resource_group_name }} \
-      --name {{ aks_cluster_name }} \
-      --overwrite-existing
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path }}"
+  ansible.builtin.debug:
+    msg: "Using kubeconfig from: {{ kubeconfig_path }}"
+  tags:
+    - setup_kubeconfig
+
+- name: Verify kubeconfig exists
+  ansible.builtin.stat:
+    path: "{{ kubeconfig_path }}"
+  register: kubeconfig_stat
+  tags:
+    - setup_kubeconfig
+
+- name: Fail if kubeconfig not found
+  ansible.builtin.fail:
+    msg: "kubeconfig not found at {{ kubeconfig_path }}. Please ensure AKS credentials are configured."
+  when: not kubeconfig_stat.stat.exists
   tags:
     - setup_kubeconfig
 
@@ -28,17 +37,18 @@
 
 # Create ACR secret for authentication
 - name: Create ACR image pull secret
-  shell: |
-    kubectl create secret docker-registry {{ acr_secret_name }} \
-      --docker-server={{ acr_login_server }} \
-      --docker-username={{ acr_username }} \
-      --docker-password={{ acr_password }} \
-      --docker-email=admin@example.com \
-      --namespace={{ namespace }} \
-      --kubeconfig={{ kubeconfig_path }} \
-      --dry-run=client -o yaml | kubectl apply -f -
-  environment:
-    KUBECONFIG: "{{ kubeconfig_path }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ acr_secret_name }}"
+        namespace: "{{ namespace }}"
+      type: kubernetes.io/dockercfg
+      data:
+        .dockercfg: '{{ (''{"'' + acr_login_server + ''": {"auth": "'' + (acr_username + '':'' + acr_password) | b64encode + ''", "email": "admin@example.com"}}'') | b64encode }}'
+    kubeconfig: "{{ kubeconfig_path }}"
   tags:
     - create_acr_secret
 
@@ -117,11 +127,11 @@
                     value: "yes"
                 resources:
                   requests:
-                    memory: "64Mi"
-                    cpu: "50m"
+                    memory: "{{ redis_memory_request }}"
+                    cpu: "{{ redis_cpu_request }}"
                   limits:
-                    memory: "256Mi"
-                    cpu: "250m"
+                    memory: "{{ redis_memory_limit }}"
+                    cpu: "{{ redis_cpu_limit }}"
     kubeconfig: "{{ kubeconfig_path }}"
   tags:
     - create_redis_deployment
@@ -190,11 +200,11 @@
                     mountPath: "{{ container_mount_path }}"
                 resources:
                   requests:
-                    memory: "{{ memory_request }}"
-                    cpu: "{{ cpu_request }}"
+                    memory: "{{ app_memory_request }}"
+                    cpu: "{{ app_cpu_request }}"
                   limits:
-                    memory: "{{ memory_limit }}"
-                    cpu: "{{ cpu_limit }}"
+                    memory: "{{ app_memory_limit }}"
+                    cpu: "{{ app_cpu_limit }}"
             volumes:
               - name: data
                 persistentVolumeClaim:
@@ -245,18 +255,50 @@
 
 # Display deployment information
 - name: Get deployment status
-  shell: |
-    kubectl get deployment {{ deployment_name }} -n {{ namespace }} -o wide \
-      --kubeconfig={{ kubeconfig_path }}
-  register: deployment_status
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    name: "{{ deployment_name }}"
+    namespace: "{{ namespace }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: deployment_info
+  tags:
+    - always
+
+- name: Format deployment status for display
+  set_fact:
+    deployment_status:
+      stdout: |
+        NAME                 READY   UP-TO-DATE   AVAILABLE   AGE
+        {{ deployment_info.resources[0].metadata.name | default('N/A') }}   
+        {{ (deployment_info.resources[0].status.readyReplicas | default(0)) }}/{{ (deployment_info.resources[0].status.replicas | default(0)) }}   
+        {{ deployment_info.resources[0].status.updatedReplicas | default(0) }}          
+        {{ deployment_info.resources[0].status.availableReplicas | default(0) }}         
+        {{ deployment_info.resources[0].metadata.creationTimestamp | default('N/A') }}
+  when: deployment_info.resources | length > 0
   tags:
     - always
 
 - name: Get service information
-  shell: |
-    kubectl get service {{ service_name }} -n {{ namespace }} -o wide \
-      --kubeconfig={{ kubeconfig_path }}
-  register: service_status
+  kubernetes.core.k8s_info:
+    kind: Service
+    name: "{{ service_name }}"
+    namespace: "{{ namespace }}"
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: service_detail
+  tags:
+    - always
+
+- name: Format service status for display
+  set_fact:
+    service_status:
+      stdout: |
+        NAME         TYPE           CLUSTER-IP    EXTERNAL-IP       PORT(S)
+        {{ service_detail.resources[0].metadata.name | default('N/A') }}   
+        {{ service_detail.resources[0].spec.type | default('N/A') }}           
+        {{ service_detail.resources[0].spec.clusterIP | default('N/A') }}   
+        {{ service_detail.resources[0].status.loadBalancer.ingress[0].ip | default('<pending>') }}   
+        {{ service_detail.resources[0].spec.ports[0].port }}/TCP
+  when: service_detail.resources | length > 0
   tags:
     - always
 
