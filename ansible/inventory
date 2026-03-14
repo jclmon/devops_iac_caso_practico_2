@@ -1,5 +1,5 @@
 [all:vars]  
-ansible_ssh_private_key_file=./../ansible/keys/id_rsa
+# ansible_ssh_private_key_file - Configure via environment or .env
 ansible_host_key_checking=False
 
 [local]
@@ -9,37 +9,38 @@ localhost ansible_connection=local
 ansible_connection=local
 
 [azure_vms]
-VM_NAME ansible_host=XXX.XXX.XX.XX
+# VM hostname (IP address removed for security)
+ansible_vm_host ansible_host=<VM_PUBLIC_IP>
 
 [azure_vms:vars]
 ansible_user=azureuser
-ansible_ssh_private_key_file=./../ansible/keys/id_rsa
+# ansible_ssh_private_key_file - Set via environment variables
 ansible_python_interpreter=/usr/bin/python3
-acr_login_server=YOUR_ACR_NAME.azurecr.io
-acr_username=YOUR_ACR_USERNAME
-acr_password=YOUR_ACR_PASSWORD
-container_image=YOUR_ACR_NAME.azurecr.io/azure-vote-front:latest
+acr_login_server=<ACR_LOGIN_SERVER>
+acr_username=<ACR_USERNAME>
+# acr_password - Set via environment variable ACR_PASSWORD
+container_image=<ACR_LOGIN_SERVER>/azure-vote-front:latest
 
 [acr]
-acr_server ansible_host=YOUR_ACR_NAME.azurecr.io
+acr_server ansible_host=<ACR_LOGIN_SERVER>
 
 [acr:vars]
 ansible_connection=local
-acr_name=YOUR_ACR_NAME
-acr_login_server=YOUR_ACR_NAME.azurecr.io
-acr_username=YOUR_ACR_USERNAME
-acr_password=YOUR_ACR_PASSWORD
+acr_name=<ACR_NAME>
+acr_login_server=<ACR_LOGIN_SERVER>
+acr_username=<ACR_USERNAME>
+# acr_password - Set via environment variable ACR_PASSWORD
 
 [aks]
-aks_cluster ansible_host=YOUR_AKS_CLUSTER_NAME
+aks_cluster ansible_host=<AKS_CLUSTER_NAME>
 
 [aks:vars]
 ansible_connection=local
-resource_group_name=YOUR_RESOURCE_GROUP_NAME
-aks_cluster_name=YOUR_AKS_CLUSTER_NAME
-aks_cluster_id=/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_RESOURCE_GROUP_NAME/providers/Microsoft.ContainerService/managedClusters/YOUR_AKS_CLUSTER_NAME
-acr_login_server=YOUR_ACR_NAME.azurecr.io
-acr_username=YOUR_ACR_USERNAME
-acr_password=YOUR_ACR_PASSWORD
-container_image=YOUR_ACR_NAME.azurecr.io/azure-vote-front:latest
-redis_image=YOUR_ACR_NAME.azurecr.io/redis:latest
+resource_group_name=<RESOURCE_GROUP_NAME>
+aks_cluster_name=<AKS_CLUSTER_NAME>
+# aks_cluster_id - Set via environment variable
+acr_login_server=<ACR_LOGIN_SERVER>
+acr_username=<ACR_USERNAME>
+# acr_password - Set via environment variable ACR_PASSWORD
+container_image=<ACR_LOGIN_SERVER>/azure-vote-front:latest
+redis_image=<ACR_LOGIN_SERVER>/redis:latest
