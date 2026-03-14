@@ -53,25 +53,48 @@
 
   post_tasks:
     - name: Wait for pods to be ready
-      shell: |
-        kubectl rollout status deployment/{{ deployment_name }} -n {{ namespace }} \
-          --timeout=5m --kubeconfig={{ kubeconfig_path }}
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: "{{ deployment_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        wait: true
+        wait_condition:
+          type: Available
+          status: "True"
+        wait_sleep: 10
+        wait_timeout: 300
       ignore_errors: true
       tags:
         - always
 
     - name: Get application access information
-      shell: |
-        EXTERNAL_IP=$(kubectl get service {{ service_name }} -n {{ namespace }} \
-          -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --kubeconfig={{ kubeconfig_path }})
+      kubernetes.core.k8s_info:
+        kind: Service
+        name: "{{ service_name }}"
+        namespace: "{{ namespace }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+      register: service_info
+      tags:
+        - always
 
-        if [ -z "$EXTERNAL_IP" ]; then
-          echo "External IP is still pending. Wait a few moments and check with:"
-          echo "kubectl get service {{ service_name }} -n {{ namespace }}"
-        else
-          echo "Application accessible at: http://$EXTERNAL_IP:{{ service_port }}"
-        fi
-      register: app_access_info
+    - name: Extract external IP from service
+      set_fact:
+        external_ip: "{{ service_info.resources[0].status.loadBalancer.ingress[0].ip | default('Pending') }}"
+      when: service_info.resources | length > 0
+      tags:
+        - always
+
+    - name: Set app access info message
+      set_fact:
+        app_access_info:
+          stdout: |
+            {% if external_ip != 'Pending' %}
+            Application accessible at: http://{{ external_ip }}:{{ service_port }}
+            {% else %}
+            External IP is still pending. Wait a few moments and check with:
+            kubectl get service {{ service_name }} -n {{ namespace }}
+            {% endif %}
       tags:
         - always
 
@@ -82,9 +105,12 @@
         - always
 
     - name: Get pod status
-      shell: |
-        kubectl get pods -n {{ namespace }} -l app={{ app_name }} \
-          -o wide --kubeconfig={{ kubeconfig_path }}
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ namespace }}"
+        label_selectors:
+          - app={{ app_name }}
+        kubeconfig: "{{ kubeconfig_path }}"
       register: pod_status
       tags:
         - always
@@ -93,6 +119,15 @@
       debug:
         msg: |
           Pod Status:
-          {{ pod_status.stdout }}
+          {% if pod_status.resources | length > 0 %}
+          {% for pod in pod_status.resources %}
+          - Name: {{ pod.metadata.name }}
+            Namespace: {{ pod.metadata.namespace }}
+            Status: {{ pod.status.phase | default('Unknown') }}
+            Ready: {{ (pod.status.conditions | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first) | default('Unknown') }}
+          {% endfor %}
+          {% else %}
+          No pods found
+          {% endif %}
       tags:
         - always
