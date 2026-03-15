@@ -1,24 +1,31 @@
-# AKS Role
+# Rol AKS Cluster Kubernetes
 
 Rol de Ansible para desplegar aplicaciones en Azure Kubernetes Service (AKS).
 
 ## Funcionalidades
 
-- ✅ Obtener kubeconfig del cluster AKS
-- ✅ Crear namespace
-- ✅ Crear secreto para ACR (image pull secret)
-- ✅ Crear ConfigMap para configuración
-- ✅ Crear Persistent Volume Claim (PVC)
-- ✅ Crear Redis Deployment (backend)
-- ✅ Crear Redis Service (ClusterIP interno)
-- ✅ Crear Frontend Deployment con:
+- Obtener kubeconfig del cluster AKS
+- Crear namespace
+- Crear secreto para ACR (image pull secret) con `kubernetes.core.k8s`
+- Crear ConfigMap para configuración
+- Crear Persistent Volume Claim (PVC)
+- Crear Redis Deployment (backend) con recursos parametrizados
+- Crear Redis Service (ClusterIP interno)
+- Crear Frontend Deployment con:
   - Image pull secrets para ACR
   - Volume mount para datos persistentes
-  - Resource requests y limits
+  - Resource requests y limits parametrizados
   - Variable de entorno REDIS apuntando a redis-service
-- ✅ Crear LoadBalancer Service
-- ✅ Esperar a que se asigne IP externa
-- ✅ Mostrar información del despliegue
+- Crear LoadBalancer Service
+- Esperar a que se asigne IP externa con `kubernetes.core.k8s_info + wait`
+- Mostrar información del despliegue con módulos nativos
+
+### Módulos Utilizados
+
+- `kubernetes.core.k8s_info` - Consulta de recursos
+- `kubernetes.core.k8s` - Creación/actualización de recursos
+- `kubernetes.core.k8s` con patch - Restart de deployments
+- Cero uso de `shell` o `command` en tasks principales
 
 ## Arquitectura
 
@@ -32,7 +39,35 @@ Frontend Pod 2 ──┘
             External IP (80)
 ```
 
-## Variables Principales
+## Requisitos
+
+- `kubernetes.core` >=2.0.0 - Kubernetes resource management
+- `azure.azcollection` >=1.14.0 - Azure operations
+- `community.general` >=5.0.0 - General utilities
+- `ansible.posix` >=1.4.0 - POSIX tools
+
+## Estructura
+
+```
+Ansible/
+├── aks_playbook.yml                    # Playbook para ejecutar el rol
+├── roles/
+│   └── aks/
+│       ├── tasks/main.yml              # Tasks principales
+│       ├── vars/main.yml               # Variables del rol
+│       ├── defaults/main.yml           # Valores por defecto
+│       ├── handlers/main.yml           # Handlers
+│       └── README.md                   # Documentación del rol
+└── inventory                           # Generado por Terraform (incluye AKS)
+```
+
+## Ejecutar el playbook
+
+```bash
+ansible-playbook -i inventory aks_playbook.yml
+```
+
+## Variables
 
 ### Requeridas
 
@@ -46,290 +81,69 @@ redis_image: "jclmoniaccasopractico2hubacr.azurecr.io/databases/redis:casopracti
 container_image: "jclmoniaccasopractico2hubacr.azurecr.io/frontend/azure-vote-front:casopractico2"
 ```
 
-### Configuración de Deployment
+### Variables del Rol (`roles/aks/defaults/main.yml`)
 
 ```yaml
-namespace: "casopractico2"
-replicas: 2
+# AKS and Azure configuration
+resource_group_name: ""
+aks_cluster_name: ""
+kubeconfig_path: "~/.kube/config"
+
+# ACR configuration
+acr_login_server: ""
+acr_username: ""
+acr_password: ""
+acr_secret_name: "acr-secret"
+
+# Kubernetes configuration
+namespace: "default"
+app_environment: "production"
+
+# Deployment configuration
+deployment_name: "app-deployment"
+app_name: "app"
+container_name: "app-container"
+container_image: "{{ acr_login_server }}/frontend/azure-vote-front:casopractico2"
+redis_image: "{{ acr_login_server }}/databases/redis:casopractico2"
 container_port: 80
-redis_image: "jclmoniaccasopractico2hubacr.azurecr.io/databases/redis:casopractico2"
-container_image: "jclmoniaccasopractico2hubacr.azurecr.io/frontend/azure-vote-front:casopractico2"
+container_mount_path: "/data"
+replicas: 2
+
+# Resource requests and limits
+cpu_request: "100m"
+memory_request: "128Mi"
+cpu_limit: "500m"
+memory_limit: "512Mi"
+
+# Service configuration
+service_name: "app-service"
+service_port: 80
+
+# Persistent Volume configuration
+pvc_name: "app-pvc"
 pvc_size: "10Gi"
-etiqueta: "casopractico2" # Etiqueta estándar de todas las imágenes
+storage_class: "default"
+
+# ConfigMap configuration
+app_config_name: "app-config"
+log_level: "INFO"
 ```
 
-## Flujo de Despliegue (Caso Práctico 2)
+## Recursos y Límites parametrizados
 
-1. **Get Credentials**: Obtiene kubeconfig de AKS
-2. **Create Namespace**: Crea namespace `casopractico2`
-3. **Create ACR Secret**: Permite ACR descargar imágenes privadas con credenciales
-4. **Create PVC**: Almacenamiento persistente de 10Gi
-5. **Create ConfigMap**: Configuración de la app
-6. **Create Redis**: Deployment con imagen `databases/redis:casopractico2`
-7. **Create Redis Service**: ClusterIP service para conectividad interna (puerto 6379)
-8. **Create Frontend**: Deployment con imagen `frontend/azure-vote-front:casopractico2` (2-3 réplicas)
-9. **Create LoadBalancer**: Service para acceso externo (puerto 80)
-10. **Wait for IP**: Espera asignación de IP externa (máx 5 minutos)
-11. **Display Info**: Muestra información de acceso y verificación
-
-## Variables de Entorno en Pods
-
-- **Frontend pods** (etiqueta :casopractico2):
-  - `REDIS=redis-service` - Conecta a Redis service interno
-  - Imagen: `databases/redis:casopractico2`
-- **Redis pod** (etiqueta :casopractico2):
-  - `ALLOW_EMPTY_PASSWORD=yes` - Permite conexión sin password
-  - Imagen: `frontend/azure-vote-front:casopractico2`
-
-## Conectividad y Flujo
-
-- **Frontend pods ↔ Redis service**: Via `redis-service` ClusterIP (interno, puerto 6379)
-  - Frontend se conecta usando variable de entorno `REDIS=redis-service`
-  - Ambos en el mismo namespace `casopractico2`
-- **External users ↔ Frontend**: Via `app-service` LoadBalancer (puerto 80)
-  - IP pública asignada automáticamente
-  - Tráfico distribuido entre 2-3 replicas de Frontend
-
-## Imágenes del Caso Práctico 2
-
-Todas las imágenes utilizan la etiqueta `:casopractico2` y están organizadas en carpetas en el ACR:
-
-- `databases/redis:casopractico2` - Backend Redis para almacenar votos
-- `frontend/azure-vote-front:casopractico2` - Frontend con interfaz de votación
-
-## Uso
-
-### Opción 1: Con playbook
+Todas las siguientes variables pueden ser sobrescritas para diferentes ambientes:
 
 ```yaml
----
-- name: Deploy to AKS
-  hosts: aks
-  vars:
-    resource_group_name: "myresourcegroup"
-    aks_cluster_name: "myakscluster"
-    acr_login_server: "myregistry.azurecr.io"
-    acr_username: "admin_user"
-    acr_password: "admin_password"
-    container_image: "myregistry.azurecr.io/jclmoniaccasopractico2hubacr:latest"
-    namespace: "production"
-    replicas: 3
-    pvc_size: "20Gi"
-  roles:
-    - aks
-```
+# Redis
+redis_replicas: 1
+redis_memory_request: "64Mi"
+redis_memory_limit: "256Mi"
+redis_cpu_request: "50m"
+redis_cpu_limit: "250m"
 
-### Opción 2: Desde línea de comandos
-
-```bash
-ansible-playbook -i inventory aks_playbook.yml \
-  -e "resource_group_name=myresourcegroup" \
-  -e "aks_cluster_name=myakscluster" \
-  -e "acr_login_server=myregistry.azurecr.io" \
-  -e "container_image: "myregistry.azurecr.io/jclmoniaccasopractico2hubacr:latest""
-```
-
-## Tags
-
-- `setup_kubeconfig`: Obtener kubeconfig
-- `create_namespace`: Crear namespace
-- `create_acr_secret`: Crear secreto de ACR
-- `create_configmap`: Crear ConfigMap
-- `create_pvc`: Crear Persistent Volume Claim
-- `create_deployment`: Crear Deployment
-- `create_service`: Crear LoadBalancer Service
-- `wait_for_lb`: Esperar IP externa
-
-Ejecutar solo ciertos tags:
-
-```bash
-ansible-playbook -i inventory aks_playbook.yml --tags "create_deployment,create_service"
-```
-
-## Recursos creados
-
-### Secreto (ImagePullSecret)
-
-- Tipo: `kubernetes.io/dockercfg`
-- Uso: Permite a AKS descargar imágenes del ACR privado
-- Nombre: `acr-secret` (configurable)
-
-### ConfigMap
-
-- Contiene variables de configuración de la aplicación
-- Nombre: `app-config` (configurable)
-
-### Persistent Volume Claim
-
-- Tamaño: 10Gi (configurable)
-- Almacenamiento: `default` storage class
-- Modo de acceso: ReadWriteOnce
-- Nombre: `app-pvc` (configurable)
-
-### Deployment
-
-- Replicas: 2 (configurable)
-- Labels: `app: <app_name>`
-- Includes health checks:
-  - Liveness probe: `/health` cada 10s
-  - Readiness probe: `/ready` cada 5s
-- Resource management:
-  - Requests: 100m CPU, 128Mi RAM
-  - Limits: 500m CPU, 512Mi RAM
-- Volume montado en `/data` (configurable)
-
-### LoadBalancer Service
-
-- Tipo: `LoadBalancer`
-- Puerto: 80 (configurable)
-- Asigna IP pública externa
-
-## Flow de ejecución
-
-1. Obtiene credenciales de AKS (`kubeconfig`)
-2. Crea namespace
-3. Crea secreto de ACR para autenticar pull de imágenes
-4. Crea ConfigMap con variables de env
-5. Crea PVC para almacenamiento persistente
-6. Crea Deployment con:
-   - Replicas del pod
-   - Image pull secret
-   - Volumen montado
-   - Health checks
-7. Crea LoadBalancer Service
-8. Espera a que se asigne IP externa
-9. Muestra información del despliegue
-
-## Requisitos previos
-
-1. **Ansible >= 2.10**
-
-   ```bash
-   pip install ansible
-   ```
-
-2. **Colección kubernetes.core**
-
-   ```bash
-   ansible-galaxy collection install kubernetes.core
-   ```
-
-3. **Azure CLI**
-
-   ```bash
-   # Windows/Linux
-   az --version
-   ```
-
-4. **kubectl**
-
-   ```bash
-   az aks install-cli
-   # O instalar manualmente
-   ```
-
-5. **Terraform apply completado**
-   - AKS cluster debe estar creado y disponible
-
-## Verificación manual
-
-```bash
-# Ver namespace
-kubectl get namespaces
-
-# Ver secretos
-kubectl get secrets -n <namespace>
-
-# Ver PVC
-kubectl get pvc -n <namespace>
-
-# Ver deployment
-kubectl get deployment -n <namespace>
-
-# Ver pods
-kubectl get pods -n <namespace> -o wide
-
-# Ver service
-kubectl get service -n <namespace>
-
-# Ver logs
-kubectl logs -f deployment/<deployment_name> -n <namespace>
-
-# Acceso a pod
-kubectl exec -it pod/<pod_name> -n <namespace> -- /bin/bash
-```
-
-## Troubleshooting
-
-### Error: "Unable to connect to the server"
-
-```
-Causa: kubeconfig inválido o cluster no accesible
-Solución:
-az aks get-credentials --resource-group myresourcegroup --name myakscluster
-```
-
-### Error: "ImagePullBackOff"
-
-```
-Causa: No puede descargar imagen del ACR
-Solución:
-1. Verificar credenciales de ACR
-2. Verificar que la imagen existe en ACR: az acr repository list
-3. Verificar permisos de pull del secreto
-```
-
-### Error: "Pending" en LoadBalancer
-
-```
-Causa: AKS aún asignando IP externa
-Solución: Esperar un poco más (30s x 10 reintentos)
-```
-
-### Error: "PersistentVolumeClaim pending"
-
-```
-Causa: No hay PV disponible o storage class no existe
-Solución:
-1. Verificar storage classes: kubectl get storageclass
-2. Crear PV manualmente si es necesario
-```
-
-## Actualizar despliegue
-
-Para actualizar a nueva versión de imagen:
-
-```bash
-# Opcional: Cambiar imagen (Deployment se recrea)
-ansible-playbook -i inventory aks_playbook.yml \
-  --tags "create_deployment" \
-  -e "container_image=myregistry.azurecr.io/nginx:v2"
-
-# O restartear manualmente
-kubectl rollout restart deployment/app-deployment -n default
-```
-
-## Eliminar recursos
-
-```bash
-# Eliminar via playbook (TODO: agregar task)
-kubectl delete deployment app-deployment -n default
-kubectl delete service app-service -n default
-kubectl delete pvc app-pvc -n default
-kubectl delete secret acr-secret -n default
-```
-
-## Seguridad
-
-⚠️ **IMPORTANTE**:
-
-- Las credenciales del ACR se almacenan en el secreto de Kubernetes
-- El kubeconfig se guarda localmente
-- Usa RBAC y Network Policies para restringir acceso
-- Actualiza regularmente las imágenes y dependencias
-
-```bash
-# Ver RBAC
-kubectl get rolebindings -n default
-kubectl get clusterrolebindings
+# Frontend App
+app_memory_request: "64Mi"
+app_memory_limit: "512Mi"
+app_cpu_request: "100m"
+app_cpu_limit: "500m"
 ```
