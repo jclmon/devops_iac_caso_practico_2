@@ -1,6 +1,6 @@
-# 🚀 DevOps IaC Caso Práctico 2 - Azure Voting Application
+# DevOps & Cloud IaC Caso Práctico 2
 
-## 📌 Descripción General
+## Descripción General
 
 Proyecto de automatización completa que despliega una aplicación de votación distribuida en Azure utilizando:
 
@@ -10,7 +10,7 @@ Proyecto de automatización completa que despliega una aplicación de votación 
 - **Kubernetes**: Orquestación de contenedores (AKS)
 - **Podman**: Contenedores en VM
 
-## 🏗️ Arquitectura
+## Arquitectura
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -32,7 +32,7 @@ Proyecto de automatización completa que despliega una aplicación de votación 
 └─────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Provisionar Infraestructura
 
@@ -71,9 +71,9 @@ kubectl get svc app-service -n casopractico2
 open http://<EXTERNAL-IP>
 ```
 
-## 📂 Estructura (Archivos)
+## Estructura (Archivos)
 
-### ✅ VERSIONADOS EN GIT
+### VERSIONADOS EN GIT
 
 ```
 terraform/
@@ -92,7 +92,7 @@ ansible/
 └── ACR_INTEGRATION.md, etc.
 ```
 
-### ⚠️ NO VERSIONADOS (.gitignore)
+### NO VERSIONADOS (.gitignore)
 
 ```
 Terraform/
@@ -109,7 +109,7 @@ Ansible/
 
 ---
 
-## 🔐 Seguridad
+## Seguridad
 
 Todos los secretos están protegidos por `.gitignore`:
 
@@ -117,10 +117,11 @@ Todos los secretos están protegidos por `.gitignore`:
 - `ansible/inventory` - Variables sensibles
 - `ansible/keys/` - Claves SSH privadas
 
-## ⚙️ Requisitos
+## Requisitos
 
-- Azure CLI
-- Terraform >= v1.0
-- Ansible >= v2.9
-- kubectl
-- Git
+- **Python >=3.8**
+- **Terraform >= v1.0**
+- **Ansible >= v2.9**
+- **kubectl** configurado (para AKS)
+- **podman** instalado (para ACR)
+- **Azure CLI** configurado
