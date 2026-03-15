@@ -2,7 +2,7 @@
 
 ## Descripción General
 
-Proyecto de automatización completa que despliega una aplicación de votación distribuida en Azure utilizando:
+Proyecto de automatización completa en Azure utilizando:
 
 - **Terraform**: Infrastructure as Code - Provisiona VMs, ACR, AKS
 - **Ansible**: Configuration Management - Gestiona aplicaciones y configuración
@@ -114,8 +114,11 @@ Ansible/
 Todos los secretos están protegidos por `.gitignore`:
 
 - `terraform.tfvars` - Credenciales de Terraform
-- `ansible/inventory` - Variables sensibles
 - `ansible/keys/` - Claves SSH privadas
+
+Ejemplo del fichero generado por Terraform
+
+- `ansible/inventory` - Variables sensibles
 
 ## Requisitos
 

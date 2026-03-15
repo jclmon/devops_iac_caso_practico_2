@@ -47,7 +47,6 @@ ansible/
 - **inventory**: Inventario dinámico de hosts (generado por Terraform)
 - **keys/id_rsa**: Clave privada SSH
 - **requirements.yml**: Especificación de colecciones Galaxy
-- **SETUP.md**: Guía completa de configuración
 
 ## Estructura del Inventario
 
@@ -77,8 +76,10 @@ El inventario generado incluye grupos para:
 
 3. **Ejecutar playbooks**:
 
+   **Todos los componentes:**
+
    ```bash
-   ansible-playbook -i inventory aks_playbook.yml
+   ansible-playbook -i inventory main_playbook.yml
    ```
 
    **Gestión de imágenes en ACR:**
@@ -93,10 +94,10 @@ El inventario generado incluye grupos para:
    ansible-playbook -i inventory vm_playbook.yml
    ```
 
-   **Todos los componentes:**
+   **Configuración de AKS:**
 
    ```bash
-   ansible-playbook -i inventory main_playbook.yml
+   ansible-playbook -i inventory aks_playbook.yml
    ```
 
 ## Roles
