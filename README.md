@@ -61,16 +61,6 @@ ansible-playbook -i inventory vm_playbook.yml
 ansible-playbook -i inventory aks_playbook.yml
 ```
 
-### 5. Acceder a la Aplicación
-
-```bash
-# Obtener LoadBalancer IP
-kubectl get svc app-service -n casopractico2
-
-# Acceder
-open http://<EXTERNAL-IP>
-```
-
 ## Estructura (Archivos)
 
 ### VERSIONADOS EN GIT
